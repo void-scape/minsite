@@ -8,14 +8,18 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: rust:latest
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install graphics drivers
+        run: |
+          apt-get update
+          apt-get install -y mesa-vulkan-drivers
 
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
@@ -26,21 +30,21 @@ jobs:
       - name: Generate the site
         run: cargo run --release --bin minsite
 
+      - name: Fix permissions
+        run: chmod -R 777 ./build
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./build
 
-  # Deployment job
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     permissions:
       pages: write
       id-token: write
-
     runs-on: ubuntu-latest
     needs: build
     steps:
