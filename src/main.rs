@@ -2,6 +2,7 @@ use comrak::plugins::syntect::SyntectAdapter;
 use comrak::{ComrakOptions, ComrakPlugins, markdown_to_html_with_plugins};
 use serde::Deserialize;
 use std::fs;
+use std::io::BufReader;
 
 #[derive(Deserialize)]
 struct Metadata {
@@ -21,6 +22,19 @@ fn main() {
     )
     .unwrap();
 
+    for frame in fs::read_dir("public/static/mandelbrot-gallery/frames").unwrap() {
+        let path = frame.unwrap().path();
+        let stem = path.file_stem().unwrap().to_str().unwrap();
+        let reader = BufReader::new(fs::File::open(&path).unwrap());
+        let img = image::load(reader, image::ImageFormat::Png).unwrap();
+        img.save_with_format(
+            format!("public/static/mandelbrot-gallery/frames/{stem}.webp"),
+            image::ImageFormat::WebP,
+        )
+        .unwrap();
+        fs::remove_file(path).unwrap();
+    }
+
     render_page(
         "public/index.html",
         &generate_gallery("static/mandelbrot-gallery"),
@@ -36,6 +50,7 @@ fn main() {
 
     let mut options = ComrakOptions::default();
     options.extension.footnotes = true;
+    options.render.unsafe_ = true;
 
     for path in paths {
         let path = path.unwrap().path();
@@ -137,22 +152,27 @@ fn generate_gallery(root: &str) -> String {
 
     html.push_str(r#"<h3 class="gallery-title">Mandelbrot Set Gallery</h2>"#);
     html.push_str(r#"<div class="gallery-grid">"#);
-    if let Ok(images) = fs::read_dir(frames) {
+    if let Ok(images) = fs::read_dir(&frames) {
         let mut images: Vec<_> = images.filter_map(|e| e.ok()).collect();
         images.sort_by_key(|e| e.path());
 
         for img in images {
-            let img = img.path();
-            let config = format!(
-                "{configs}/{}.toml",
-                img.file_stem().unwrap().to_str().unwrap()
-            );
-
+            let path = img.path();
+            let stem = path.file_stem().unwrap().to_str().unwrap();
+            let frame = format!("{frames}/{}.webp", stem);
+            let config = format!("{configs}/{}.toml", stem);
             let toml = fs::read_to_string(&config).unwrap().replace("\"", "&quot;");
-            let img = img.to_str().unwrap();
 
             html.push_str(&format!(
-                r#"<img src="{img}" class="gallery-item" data-toml="{toml}" onclick="copyToml(this)" alt="Copy Config">"#,
+                r#"<img 
+                    src="{frame}" 
+                    class="gallery-item" 
+                    width="400" 
+                    height="400"
+                    data-toml="{toml}" 
+                    onclick="copyToml(this)" 
+                    alt="Copy Config"
+                >"#,
             ));
         }
     }

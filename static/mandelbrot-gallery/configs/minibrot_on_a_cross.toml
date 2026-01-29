@@ -1,11 +1,11 @@
 x = "0.2542099079452338"
 y = "-0.0004374588482306643"
 zoom = "7e-9"
-iterations = 100_000
-width = 800
-height = 800
+iterations = 1_000_000
+width = 400
+height = 400
 palette = "magma"
 ssaa = true
 batch_iter = 10000
 color_scale = 1.0
-color_mode = "iterations"
+color_mode = "wave"

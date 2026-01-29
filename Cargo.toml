@@ -10,6 +10,7 @@ members = ["fract"]
 [dependencies]
 comrak = "0.19"
 copy_dir = "0.1.3"
+image = { version = "0.25.9", default-features = false, features = ["rayon", "png", "webp"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
 syntect = "5.2"
