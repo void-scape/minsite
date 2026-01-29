@@ -20,11 +20,11 @@ jobs:
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Generate mandelbrot renders
+        run: ./render-images.sh
+
       - name: Generate the site
         run: cargo run --release --bin minsite
-
-      - name: Generate mandelbrot renders
-        run: render-images.sh
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
