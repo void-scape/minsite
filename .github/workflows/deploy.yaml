@@ -31,12 +31,12 @@ jobs:
         run: cargo run --release --bin minsite
 
       - name: Fix permissions
-        run: chmod -R 777 ./build
+        run: chmod -R 777 ./public
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./build
+          path: ./public
 
   deploy:
     environment:
