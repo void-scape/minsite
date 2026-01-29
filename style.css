@@ -139,8 +139,26 @@ th {
   box-sizing: border-box; 
 }
 
+img {
+  width: 100%;
+  height: auto;
+  display: block;
+  aspect-ratio: 1 / 1;
+  background-color: #2d2d2d;
+  transition: opacity 0.6s ease-in-out, transform 0.3s ease;
+  opacity: 1;
+}
+
+img.loading {
+    opacity: 0;
+}
+
 .gallery-item {
   cursor: pointer;
+}
+
+.gallery-item:hover {
+    transform: scale(1.02);
 }
 
 img.gallery-item {
