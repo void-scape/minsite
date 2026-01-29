@@ -1,5 +1,7 @@
+use comrak::nodes::{AstNode, NodeValue};
+use comrak::options::Plugins;
 use comrak::plugins::syntect::SyntectAdapter;
-use comrak::{ComrakOptions, ComrakPlugins, markdown_to_html_with_plugins};
+use comrak::{Arena, format_html_with_plugins, parse_document};
 use serde::Deserialize;
 use std::fs;
 use std::io::BufReader;
@@ -15,24 +17,21 @@ fn main() {
     _ = fs::remove_dir_all("public");
     _ = fs::create_dir("public");
     fs::copy("style.css", "public/style.css").unwrap();
-    fs::create_dir("public/static").unwrap();
-    copy_dir::copy_dir(
-        "static/mandelbrot-gallery",
-        "public/static/mandelbrot-gallery",
-    )
-    .unwrap();
+    copy_dir::copy_dir("static", "public/static").unwrap();
 
-    for frame in fs::read_dir("public/static/mandelbrot-gallery/frames").unwrap() {
-        let path = frame.unwrap().path();
-        let stem = path.file_stem().unwrap().to_str().unwrap();
-        let reader = BufReader::new(fs::File::open(&path).unwrap());
-        let img = image::load(reader, image::ImageFormat::Png).unwrap();
-        img.save_with_format(
-            format!("public/static/mandelbrot-gallery/frames/{stem}.webp"),
-            image::ImageFormat::WebP,
-        )
-        .unwrap();
-        fs::remove_file(path).unwrap();
+    if let Ok(frames) = fs::read_dir("public/static/mandelbrot-gallery/frames") {
+        for frame in frames {
+            let path = frame.unwrap().path();
+            let stem = path.file_stem().unwrap().to_str().unwrap();
+            let reader = BufReader::new(fs::File::open(&path).unwrap());
+            let img = image::load(reader, image::ImageFormat::Png).unwrap();
+            img.save_with_format(
+                format!("public/static/mandelbrot-gallery/frames/{stem}.webp"),
+                image::ImageFormat::WebP,
+            )
+            .unwrap();
+            fs::remove_file(path).unwrap();
+        }
     }
 
     render_page(
@@ -41,17 +40,20 @@ fn main() {
         "Nic Ball",
     );
 
-    let adapter = SyntectAdapter::new("base16-mocha.dark");
-    let mut plugins = ComrakPlugins::default();
+    let adapter = SyntectAdapter::new(Some("base16-mocha.dark"));
+    let mut plugins = Plugins::default();
     plugins.render.codefence_syntax_highlighter = Some(&adapter);
 
     let paths = fs::read_dir("content").unwrap();
     let mut article_list_html = String::new();
 
-    let mut options = ComrakOptions::default();
+    let mut options = comrak::Options::default();
+    options.extension.table = true;
     options.extension.footnotes = true;
-    options.render.unsafe_ = true;
+    options.render.r#unsafe = true;
+    options.extension.math_dollars = true;
 
+    let arena = Arena::new();
     for path in paths {
         let path = path.unwrap().path();
         if path.extension().and_then(|s| s.to_str()) == Some("md") {
@@ -62,8 +64,25 @@ fn main() {
             let metadata = serde_yaml::from_str::<Metadata>(parts[1]).unwrap();
             let stem = path.file_stem().unwrap().to_str().unwrap();
 
-            let html = markdown_to_html_with_plugins(parts[2], &options, &plugins)
-                .replace(".md\"", ".html\"");
+            let root = parse_document(&arena, parts[2], &options);
+            iter_nodes(root, &|node| {
+                let mut data = node.data.borrow_mut();
+                if let NodeValue::Math(props) = &data.value {
+                    let opts = katex::Opts::builder()
+                        .display_mode(props.display_math)
+                        .output_type(katex::OutputType::Mathml)
+                        .build()
+                        .unwrap();
+
+                    if let Ok(html) = katex::render_with_opts(&props.literal, &opts) {
+                        data.value = NodeValue::HtmlInline(html);
+                    }
+                }
+            });
+
+            let mut html = String::new();
+            format_html_with_plugins(root, &options, &mut html, &plugins).unwrap();
+            html = html.replace(".md\"", ".html\"");
 
             render_page(&format!("public/{}.html", stem), &html, &metadata.title);
             article_list_html.push_str(&format!(
@@ -82,6 +101,16 @@ fn main() {
     }
 
     render_page("public/articles.html", &article_list_html, "Articles");
+}
+
+fn iter_nodes<'a, F>(node: &'a AstNode<'a>, f: &F)
+where
+    F: Fn(&'a AstNode<'a>),
+{
+    f(node);
+    for c in node.children() {
+        iter_nodes(c, f);
+    }
 }
 
 fn render_page(filename: &str, content: &str, title: &str) {
