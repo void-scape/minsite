@@ -152,14 +152,7 @@ fn generate_gallery(root: &str) -> String {
             let img = img.to_str().unwrap();
 
             html.push_str(&format!(
-                r#"<img 
-                    src="{img}" 
-                    class="gallery-item loading" 
-                    data-toml="{toml}" 
-                    onclick="copyToml(this)" 
-                    onload="this.classList.remove('loading')"
-                    loading="lazy"
-                    alt="Mandelbrot Fractal">"#,
+                r#"<img src="{img}" class="gallery-item" data-toml="{toml}" onclick="copyToml(this)" alt="Copy Config">"#,
             ));
         }
     }
