@@ -1,0 +1,11 @@
+x = ".250414246919196"
+y = "0.0000134864436812731"
+zoom = "6e-7"
+iterations = 100_000
+width = 800
+height = 800
+palette = "magma"
+ssaa = true
+batch_iter = 10000
+color_scale = 1.0
+color_mode = "iterations"
