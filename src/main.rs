@@ -5,6 +5,7 @@ use comrak::{Arena, format_html_with_plugins, parse_document};
 use serde::Deserialize;
 use std::fs;
 use std::io::BufReader;
+use std::process::Command;
 
 #[derive(Deserialize)]
 struct Metadata {
@@ -17,6 +18,9 @@ fn main() {
     _ = fs::remove_dir_all("public");
     _ = fs::create_dir("public");
     fs::copy("style.css", "public/style.css").unwrap();
+
+    render_wasm_page("public/viewer.html", "Mandelbrot Viewer");
+
     copy_dir::copy_dir("static", "public/static").unwrap();
 
     if let Ok(frames) = fs::read_dir("public/static/mandelbrot-gallery/frames") {
@@ -131,7 +135,8 @@ fn render_page(filename: &str, content: &str, title: &str) {
                         <h3>Nic Ball</h3>
                     </div>
                     <div class="nav-links">
-                        <a href="index.html">Home</a>
+                        <a href="index.html">Gallery</a>
+                        <a href="viewer.html">Viewer</a>
                         <a href="articles.html">Articles</a>
                     </div>
                     <div class="nav-github">
@@ -151,21 +156,6 @@ fn render_page(filename: &str, content: &str, title: &str) {
                     <a href="{}" class="back-to-top">Back to Top</a>
                 </div>
             </footer>
-
-            <script>
-                function copyToml(img) {{
-                    const toml = img.getAttribute('data-toml');
-                    navigator.clipboard.writeText(toml).then(() => {{
-                        const toast = document.getElementById('toast');
-                        toast.classList.add('show');
-                        setTimeout(() => {{
-                            toast.classList.remove('show');
-                        }}, 3000);
-                    }}).catch(err => {{
-                        console.error('Failed to copy text: ', err);
-                    }});
-                }}
-            </script>
         </body>
         </html>"#,
         title, content, "#top"
@@ -190,20 +180,54 @@ fn generate_gallery(root: &str) -> String {
             let stem = path.file_stem().unwrap().to_str().unwrap();
             let frame = format!("{frames}/{}.webp", stem);
             let config = format!("{configs}/{}.toml", stem);
-            let toml = fs::read_to_string(&config).unwrap().replace("\"", "&quot;");
+
+            let toml = fs::read_to_string(&config).unwrap_or_default();
+            let encoded = urlencoding::encode(&toml);
 
             html.push_str(&format!(
-                r#"<img 
-                    src="{frame}" 
-                    class="gallery-item" 
-                    width="400" 
-                    height="400"
-                    data-toml="{toml}" 
-                    onclick="copyToml(this)" 
-                    alt="Copy Config"
-                >"#,
+                r#"<a href="viewer.html?config={encoded}" title="Run in Viewer">
+                    <img 
+                        src="{frame}" 
+                        class="gallery-item" 
+                        width="400" 
+                        height="400"
+                        alt="{stem}"
+                    >
+                </a>"#,
             ));
         }
     }
+    html.push_str("</div>");
     html
+}
+
+fn render_wasm_page(filename: &str, title: &str) {
+    let wasm_path = "./static/viewer/fract.js";
+
+    Command::new("wasm-pack")
+        .args([
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../static/viewer",
+            "fract",
+        ])
+        .status()
+        .expect("Failed to run wasm-pack");
+
+    let content = format!(
+        r#"
+        <div id="fract"></div>
+        <script type="module">
+            import init from '{}';
+            async function run() {{
+                await init();
+            }}
+            run();
+        </script>
+        "#,
+        wasm_path
+    );
+    render_page(filename, &content, title);
 }

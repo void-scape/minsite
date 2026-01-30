@@ -27,6 +27,9 @@ jobs:
       - name: Generate mandelbrot renders
         run: ./render-images.sh
 
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
       - name: Generate the site
         run: cargo run --release --bin minsite
 
